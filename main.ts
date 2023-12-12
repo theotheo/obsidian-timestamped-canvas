@@ -86,7 +86,11 @@ export default class TimestampedCanvas extends Plugin {
 			const canvasUninstaller = around(canvas.constructor.prototype, {
 				addNode(oldMethod) {
 					return function (...args) {
-						args[0]['unknownData'] = {'timestamp': createTimestamp()};
+						const node = args[0]
+						if (node['unknownData'] === undefined) {
+							node['unknownData'] = {}
+						}
+						node['unknownData'] = {'timestamp': createTimestamp()};
 						const result = oldMethod && oldMethod.apply(this, args);
 						return result;
 					}
