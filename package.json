@@ -1,6 +1,6 @@
 {
 	"name": "canvas-timestamp",
-	"version": "0.0.2",
+	"version": "0.1.0",
 	"description": "A plugin to timestamp new nodes and edges in canvas",
 	"main": "main.js",
 	"scripts": {
