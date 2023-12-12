@@ -170,10 +170,6 @@ export default class TimestampedCanvas extends Plugin {
 						const div = this.timestampEl || this.nodeEl.createDiv("canvas-node-timestamp");
 						this.timestampEl = div;
 						div.setText(this?.unknownData?.timestamp);	
-						
-						if (plugin.isHide) {
-							console.log('hide')
-						}
 
 						return 
 					}
