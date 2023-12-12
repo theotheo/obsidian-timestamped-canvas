@@ -53,7 +53,8 @@ export default class TimestampedCanvas extends Plugin {
 		await this.loadSettings();
 
 		this.patchCanvas();
-		this.patchCanvasNode()
+		this.patchCanvasNode();
+		this.patchCanvasEdge();
 		
 		this.addSettingTab(new TimestampedCanvasSettingTab(this.app, this));
 	}
@@ -97,7 +98,11 @@ export default class TimestampedCanvas extends Plugin {
 				},
 				addEdge(oldMethod) {
 					return function (...args) {
-						args[0]['label'] = createTimestamp();
+						const edge = args[0]
+						if (edge['unknownData'] === undefined) {
+							edge['unknownData'] = {}
+						}
+						edge['unknownData'] = {'timestamp': createTimestamp()};
 						const result = oldMethod && oldMethod.apply(this, args);
 						return result;
 					}
@@ -114,6 +119,14 @@ export default class TimestampedCanvas extends Plugin {
 										node?.timestampEl.addClass('canvas-node-timestamp-hide')
 									} else {
 										node?.timestampEl.removeClass('canvas-node-timestamp-hide')
+									}
+								})
+
+								this.edges.forEach(edge => {
+									if (plugin.isHide) {
+										edge?.timestampEl.addClass('canvas-edge-timestamp-hide')
+									} else {
+										edge?.timestampEl.removeClass('canvas-edge-timestamp-hide')
 									}
 								})
 							})
@@ -141,6 +154,66 @@ export default class TimestampedCanvas extends Plugin {
 			}
 		});
 	}
+
+	patchCanvasEdge() {
+		const createTimestamp = () => {
+			return moment().format(this.settings.dateFormat)
+		}
+
+		const patchEdge = () => {
+			const canvasView = app.workspace.getLeavesOfType("canvas").first()?.view;
+			// @ts-ignore
+			const canvas = canvasView?.canvas;
+			if(!canvas) return false;
+
+			const edge = Array.from(canvas.edges).first();
+			if (!edge) return false;
+
+
+			// @ts-ignore
+			const edgeInstance = edge[1];
+
+			const edgeUninstaller = around(edgeInstance.constructor.prototype, {
+				render(oldMethod) {
+					return function (...args) {
+						const result = oldMethod && oldMethod.apply(this, args);
+						const coords = this.getCenter();
+
+						const div = this.timestampEl || this.canvas.canvasEl.createDiv("canvas-edge-timestamp");
+						div.style.transform = "translate(".concat(coords.x, "px, ").concat(coords.y, "px)")
+
+						this.timestampEl = div;
+						div.setText(this?.unknownData?.timestamp);	
+
+						return 
+					}
+				},
+				destroy(oldMethod) {
+					return function (...args) {
+						if (this.timestampEl) {
+							this.timestampEl.remove()
+						}
+						const result = oldMethod && oldMethod.apply(this, args);
+
+					}
+				}
+			})
+
+			this.register(edgeUninstaller);
+
+			console.log("timestamped-canvas: canvas edge patched");
+			return true;
+		}
+
+		this.app.workspace.onLayoutReady(() => {
+				if (!patchEdge()) {
+					const evt = app.workspace.on("layout-change", () => {
+						patchEdge() && app.workspace.offref(evt);
+					});
+					this.registerEvent(evt);
+				}
+			});
+		}
 
 	patchCanvasNode() {
 		const createTimestamp = () => {

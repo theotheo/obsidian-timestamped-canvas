@@ -15,3 +15,11 @@
 .canvas-node-timestamp.canvas-node-timestamp-hide {
     display: none;
 }
+
+.canvas-edge-timestamp {
+    color: var(--canvas-card-label-color);
+}
+
+.canvas-edge-timestamp.canvas-edge-timestamp-hide {
+    display: none;
+}
