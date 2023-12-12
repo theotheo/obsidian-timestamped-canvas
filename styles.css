@@ -1,8 +1,17 @@
-/*
+.canvas-node-timestamp {
+    position: absolute;
+    left: 0;
+    bottom: 0; 
+    transform: translate(0, +130%) scale(var(--zoom-multiplier));
+    transform-origin: bottom left;
+    max-width: calc(100% / var(--zoom-multiplier));
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--canvas-card-label-color);
+    --icon-size: 1em;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
-
-If your plugin does not need CSS, delete this file.
-
-*/
+.canvas-node-timestamp.canvas-node-timestamp-hide {
+    display: none;
+}

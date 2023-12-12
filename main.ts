@@ -46,12 +46,14 @@ export class TimestampedCanvasSettingTab extends PluginSettingTab {
 
 export default class TimestampedCanvas extends Plugin {
 	settings: TimestampedCanvasSetting;
+	isHide: boolean = false;
 
 
 	async onload() {
 		await this.loadSettings();
 
 		this.patchCanvas();
+		this.patchCanvasNode()
 		
 		this.addSettingTab(new TimestampedCanvasSettingTab(this.app, this));
 	}
@@ -80,12 +82,12 @@ export default class TimestampedCanvas extends Plugin {
 			const canvas = canvasView?.canvas;
 			if (!canvasView) return false;
 
+			const plugin = this;
 			const canvasUninstaller = around(canvas.constructor.prototype, {
-				createTextNode(oldMethod) {
+				addNode(oldMethod) {
 					return function (...args) {
-						args[0]['text'] = createTimestamp();
+						args[0]['unknownData'] = {'timestamp': createTimestamp()};
 						const result = oldMethod && oldMethod.apply(this, args);
-						console.log("wrapper 1 after someMethod", result);
 						return result;
 					}
 				},
@@ -95,9 +97,29 @@ export default class TimestampedCanvas extends Plugin {
 						const result = oldMethod && oldMethod.apply(this, args);
 						return result;
 					}
+				},
+				showQuickSettingsMenu(oldMethod) {
+					return function (...args) {
+						const e = args[0]
+						e.addItem((e) => {
+							return e.setSection("canvas").setTitle("Hide/show timestamps").setIcon("lucide-eye-off").onClick( () => {
+								plugin.isHide = !plugin.isHide
+								
+								this.nodes.forEach(node => {
+									if (plugin.isHide) {
+										node?.timestampEl.addClass('canvas-node-timestamp-hide')
+									} else {
+										node?.timestampEl.removeClass('canvas-node-timestamp-hide')
+									}
+								})
+							})
+						})
+
+						const result = oldMethod && oldMethod.apply(this, args);
+						return result;
+					}
 				}
 			})
-
 
 			this.register(canvasUninstaller);
 
@@ -116,5 +138,79 @@ export default class TimestampedCanvas extends Plugin {
 		});
 	}
 
+	patchCanvasNode() {
+		const createTimestamp = () => {
+			return moment().format(this.settings.dateFormat)
+		}
+
+		const patchNode = () => {
+			const canvasView = app.workspace.getLeavesOfType("canvas").first()?.view;
+			// @ts-ignore
+			const canvas = canvasView?.canvas;
+			if(!canvas) return false;
+
+			const node = Array.from(canvas.nodes).first();
+			if (!node) return false;
+
+
+			// @ts-ignore
+			const nodeInstance = node[1];
+			const plugin = this;
+
+
+			const uninstaller = around(nodeInstance.constructor.prototype, {
+				render(oldMethod) {
+					return function (...args) {
+						const result = oldMethod && oldMethod.apply(this, args);
+
+						const div = this.timestampEl || this.nodeEl.createDiv("canvas-node-timestamp");
+						this.timestampEl = div;
+						div.setText(this?.unknownData?.timestamp);	
+						
+						if (plugin.isHide) {
+							console.log('hide')
+						}
+
+						return 
+					}
+				},
+				showMenu(oldMethod) {
+					return function (...args) {
+						const e = args[0];
+
+						e.addItem(e => {
+							return e.setSection("canvas").setTitle('Clear timestamp').setIcon("lucide-alarm-minus").onClick(() => {
+								if (this?.unknownData?.timestamp) {
+									this['unknownData']['timestamp'] = ''
+								}
+							})
+						})
+						e.addItem(e => {
+							return e.setSection("canvas").setTitle('Update timestamp').setIcon("lucide-alarm-plus").onClick(() => {
+								this['unknownData']['timestamp'] = createTimestamp()
+							})
+						})
+						
+						return oldMethod && oldMethod.apply(this, args);
+
+					}
+				}
+			});
+			this.register(uninstaller);
+
+			console.log("timestamped-canvas: canvas node patched");
+			return true;
+		}
+		this.app.workspace.onLayoutReady(() => {
+			if (!patchNode()) {
+				const evt = app.workspace.on("layout-change", () => {
+					patchNode() && app.workspace.offref(evt);
+				});
+				this.registerEvent(evt);
+			}
+		});
+	}
+
+	
 
 }
